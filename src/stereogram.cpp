@@ -211,7 +211,12 @@ unsigned int stereogram::get_depth_value(int x, int y)
 	double val = this->depth_buffer[x + y * this->width];
 	val = 1.0 - val;
 	val *= 255;
-	return static_cast<unsigned int>(val);
+
+	// Test 1
+	val *= 200;
+	if (val > 255.0) val = 255.0;
+
+	return static_cast<unsigned int>(val) & 0xFF;
 }
 
 stereogram::color stereogram::get_color_value(int x, int y)

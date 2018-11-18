@@ -65,7 +65,7 @@ void camera::adjust_position()
 {
 	auto frame_time = this->frame->get_last_frame_time();
 
-	const double speed = 5;
+	const double speed = 500;
 	const double reduction_factor = 0.000001 * speed;
 	const double scale = frame_time * reduction_factor;
 

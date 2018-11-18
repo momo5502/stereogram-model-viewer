@@ -2,8 +2,11 @@ require "deps/premake/gsl"
 require "deps/premake/glm"
 require "deps/premake/glew"
 require "deps/premake/glfw"
+require "deps/premake/zlib"
+require "deps/premake/lodepng"
+require "deps/premake/tinyobjloader"
 
-workspace "stereogram-model-viewer"
+workspace "model-viewer"
 	location "./build"
 	objdir "%{wks.location}/obj"
 	targetdir "%{wks.location}/bin/%{cfg.platform}/%{cfg.buildcfg}"
@@ -32,7 +35,7 @@ workspace "stereogram-model-viewer"
 		flags { "MultiProcessorCompile" }
 		optimize "Debug"
 
-	project "stereogram-model-viewer"
+	project "model-viewer"
 		kind "WindowedApp"
 		language "C++"
 		files {
@@ -68,7 +71,13 @@ workspace "stereogram-model-viewer"
 		
 		glew.import()
 		glfw.import()
+		zlib.import()
+		lodepng.import()
+		tinyobjloader.import()
 
 	group "Dependencies"
 		glew.project()
 		glfw.project()
+		zlib.project()
+		lodepng.project()
+		tinyobjloader.project()

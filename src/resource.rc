@@ -61,12 +61,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "momo5502"
-            VALUE "FileDescription", "stereogram-model-viewer"
+            VALUE "FileDescription", "model-viewer"
             VALUE "FileVersion", "1.0.0.0"
-            VALUE "InternalName", "stereogram-model-viewer"
+            VALUE "InternalName", "model-viewer"
             VALUE "LegalCopyright", "Copyright (C) 2017 momo5502. All rights reserved."
-            VALUE "OriginalFilename", "stereogram-model-viewer.exe"
-            VALUE "ProductName", "stereogram-model-viewer"
+            VALUE "OriginalFilename", "model-viewer.exe"
+            VALUE "ProductName", "model-viewer"
             VALUE "ProductVersion", "1.0.0.0"
         END
     END
