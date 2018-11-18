@@ -3,8 +3,6 @@
 #include <shader.hpp>
 #include <paintable.hpp>
 
-//#define SHOW_DEPTH
-
 class stereogram : public paintable
 {
 public:

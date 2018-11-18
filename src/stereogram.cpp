@@ -20,6 +20,7 @@ stereogram::stereogram()
 		"void main(void)"
 		"{"
 		"	gl_FragColor = texture2D(tex_sampler,gl_TexCoord[0].st);"
+		//"   gl_FragColor.a = 0.5;"
 		"}";
 
 	this->shader_program = std::make_unique<shader>(vertex_shader_source, fragment_shader_source);
@@ -91,21 +92,22 @@ void stereogram::update_texture()
 	glGetIntegerv(GL_TEXTURE_BINDING_2D, &texture_2d);
 	glBindTexture(GL_TEXTURE_2D, this->texture);
 
-#ifdef SHOW_DEPTH
-	for (int y = 0; y < this->height; ++y)
+	if (GetKeyState(VK_CAPITAL) & 0x0001) // Ugly, but for now it's ok
 	{
-		for (int x = 0; x < this->width; ++x)
+		for (int y = 0; y < this->height; ++y)
 		{
-			unsigned char depth_value = static_cast<unsigned char>(this->get_depth_value(x, y));
+			for (int x = 0; x < this->width; ++x)
+			{
+				unsigned char depth_value = static_cast<unsigned char>(this->get_depth_value(x, y));
 
-			color color;
-			color.r = depth_value;
-			color.g = depth_value;
-			color.b = depth_value;
-			this->set_color_value(x, y, color);
+				color color;
+				color.r = depth_value;
+				color.g = depth_value;
+				color.b = depth_value;
+				this->set_color_value(x, y, color);
+			}
 		}
 	}
-#endif
 
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, this->width, this->height, GL_RGB, GL_UNSIGNED_BYTE, this->color_buffer.get());
 
@@ -175,7 +177,7 @@ void stereogram::paint_color_buffer()
 {
 	context_saver _;
 
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
