@@ -8,15 +8,21 @@
 
 This tool renders Wavefront objects in a scene as random dot autostereogram
 
+Click on the images to see an animated preview!
+
 ## Depth view
 
-![depth](https://momo5502.com/img/i/1542561141.png)
-
+<a href="https://momo5502.com/img/i/1542561141.png" target="_blank">
+    <img src="https://momo5502.com/img/i/1542562607.png" />
+</a>
 
 ## Random dot
-![demo](https://momo5502.com/img/i/1542561162.png)
+
+<a href="https://momo5502.com/img/i/1542561162.png" target="_blank">
+    <img src="https://momo5502.com/img/i/1542562608.png" />
+</a>
 
 ## References
-https://en.wikipedia.org/wiki/Wavefront_.obj_file
-https://en.wikipedia.org/wiki/Random_dot_stereogram
-https://developer.nvidia.com/gpugems/GPUGems/gpugems_ch41.html
+https://en.wikipedia.org/wiki/Wavefront_.obj_file  
+https://en.wikipedia.org/wiki/Random_dot_stereogram  
+https://developer.nvidia.com/gpugems/GPUGems/gpugems_ch41.html  
