@@ -20,43 +20,49 @@ void obj_loader::parse_file()
 
 	if (file.good())
 	{
-		tinyobj::callback_t cb;
-		cb.vertex_cb = obj_loader::vertex_callback_static;
-		cb.index_cb = obj_loader::index_callback_static;
+		tinyobj::MaterialFileReader mtl_reader(this->file_path.parent_path().generic_string() + "/");
 
-		tinyobj::LoadObjWithCallback(file, cb, this, nullptr, nullptr, nullptr);
+		tinyobj::LoadObj(&this->attrib, &this->shapes, &this->materials, nullptr, nullptr, &file, &mtl_reader);
+
+		this->load_textures();
+		this->sort_surfaces();
+	}
+}
+
+void obj_loader::load_textures()
+{
+	this->textures.clear();
+	for (auto& material : this->materials)
+	{
+		auto tex_path = this->file_path.parent_path() / material.ambient_texname;
+
+		model::texture tex;
+		lodepng::decode(tex.data, tex.width, tex.height, tex_path.generic_string());
+
+		this->textures.push_back(std::move(tex));
+	}
+}
+
+void obj_loader::sort_surfaces()
+{
+	this->surfaces.clear();
+	this->surfaces.resize(this->materials.size());
+
+	for (auto& shape : this->shapes)
+	{
+		for (size_t i = 0; i < shape.mesh.material_ids.size(); ++i)
+		{
+			auto material = shape.mesh.material_ids[i];
+
+			this->surfaces[material].indices.push_back(shape.mesh.indices[i * 3 + 0]);
+			this->surfaces[material].indices.push_back(shape.mesh.indices[i * 3 + 1]);
+			this->surfaces[material].indices.push_back(shape.mesh.indices[i * 3 + 2]);
+		}
 	}
 }
 
 model obj_loader::get_model()
 {
-	return model(this->vertices, this->faces);
-}
 
-void obj_loader::vertex_callback(tinyobj::real_t x, tinyobj::real_t y, tinyobj::real_t z, tinyobj::real_t w)
-{
-	this->vertices.push_back({ x, y, z, w });
-}
-
-void obj_loader::vertex_callback_static(void *user_data, tinyobj::real_t x, tinyobj::real_t y, tinyobj::real_t z, tinyobj::real_t w)
-{
-	reinterpret_cast<obj_loader*>(user_data)->vertex_callback(x, y, z, w);
-}
-
-void obj_loader::index_callback(tinyobj::index_t *indices, int num_indices)
-{
-	if (num_indices >= 3)
-	{
-		this->faces.push_back({ indices[0].vertex_index - 1, indices[1].vertex_index - 1, indices[2].vertex_index - 1 });
-
-		if (num_indices == 4)
-		{
-			this->faces.push_back({ indices[2].vertex_index - 1, indices[3].vertex_index - 1, indices[0].vertex_index - 1 });
-		}
-	}
-}
-
-void obj_loader::index_callback_static(void *user_data, tinyobj::index_t *indices, int num_indices)
-{
-	reinterpret_cast<obj_loader*>(user_data)->index_callback(indices, num_indices);
+	return model(this->attrib, this->surfaces, this->textures);
 }

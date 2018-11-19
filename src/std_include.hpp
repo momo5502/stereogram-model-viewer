@@ -23,6 +23,7 @@
 #include <thread>
 #include <fstream>
 #include <random>
+#include <filesystem>
 
 #include <gsl/gsl>
 
@@ -34,6 +35,8 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
+#include <lodepng.h>
 
 #include <tiny_obj_loader.h>
 #pragma warning(pop)

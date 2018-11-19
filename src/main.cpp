@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
 		list->add(&camera);
 		list->add(&background);
 		list->add(&model);
-		list->add(&stereogram);
+		//list->add(&stereogram);
 
 		window.show();
 	}

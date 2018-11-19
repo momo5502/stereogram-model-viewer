@@ -11,9 +11,22 @@ shader::shader(std::string vertex_source, std::string fragment_source, std::vect
 	glShaderSource(this->vertex_shader, 1, &vertex_shader_source, NULL);
 	glCompileShader(this->vertex_shader);
 
+	char log[1024];
+	int len = 0;
+	glGetShaderInfoLog(this->vertex_shader, 1024, &len, log);
+	OutputDebugStringA("Vertex shader log:\n");
+	OutputDebugStringA(log);
+	OutputDebugStringA("\n\n");
+
 	this->fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(this->fragment_shader, 1, &fragment_shader_source, NULL);
 	glCompileShader(this->fragment_shader);
+
+	glGetShaderInfoLog(this->fragment_shader, 1024, &len, log);
+
+	OutputDebugStringA("Fragment shader log:\n");
+	OutputDebugStringA(log);
+	OutputDebugStringA("\n\n");
 
 	this->shader_program = glCreateProgram();
 	glAttachShader(this->shader_program, this->fragment_shader);

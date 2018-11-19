@@ -202,8 +202,6 @@ void stereogram::paint_color_buffer()
 	glTexCoord2i(1, 1); glVertex3i((this->width + x), (this->height + y), 0);
 	glTexCoord2i(1, 0); glVertex3i((this->width + x), y, 0);
 	glEnd();
-
-	glEnable(GL_TEXTURE_2D);
 }
 
 unsigned int stereogram::get_depth_value(int x, int y)

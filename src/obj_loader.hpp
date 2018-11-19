@@ -11,19 +11,16 @@ public:
 	model get_model();
 
 private:
-	std::string file_path;
+	std::filesystem::path file_path;
 
-	std::vector<glm::dvec4> vertices;
-	std::vector<glm::dvec2> uvs;
-	std::vector<std::array<int,3>> faces;
-
+	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+
+	std::vector<model::surface> surfaces;
+	std::vector<model::texture> textures;
 
 	void parse_file();
-
-	void vertex_callback(tinyobj::real_t x, tinyobj::real_t y, tinyobj::real_t z, tinyobj::real_t w);
-	static void vertex_callback_static(void *user_data, tinyobj::real_t x, tinyobj::real_t y, tinyobj::real_t z, tinyobj::real_t w);
-
-	void index_callback(tinyobj::index_t *indices, int num_indices);
-	static void index_callback_static(void *user_data, tinyobj::index_t *indices, int num_indices);
+	void load_textures();
+	void sort_surfaces();
 };
