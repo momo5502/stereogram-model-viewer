@@ -38,6 +38,8 @@ void model::create_texture(const model::texture& tex)
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, tex.width, tex.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex.data.data());
 
+	glGenerateMipmap(GL_TEXTURE_2D);
+
 	this->texture_buffers.push_back(texture);
 }
 
@@ -139,8 +141,8 @@ void model::create_shader()
 	static auto vertex_shader_source =
 		"#version 400\n"
 
-		"layout(location = 0) in vec3 vertex_position;"
-		"layout(location = 1) in vec2 vertex_uv;"
+		"in vec3 vertex_position;"
+		"in vec2 vertex_uv;"
 
 		"out vec2 uv;"
 

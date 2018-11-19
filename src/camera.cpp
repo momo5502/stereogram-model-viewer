@@ -125,7 +125,7 @@ void camera::transform_world()
 	int viewport_width = viewport[2] - viewport[0];
 	int viewport_height = viewport[3] - viewport[1];
 
-	gluPerspective(65, viewport_width * 1.0 / viewport_height, 1, 50000);
+	gluPerspective(65, viewport_width * 1.0 / viewport_height, 1, 500000);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
