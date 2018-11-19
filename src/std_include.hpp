@@ -14,6 +14,7 @@
 #include <string.h>
 
 #pragma warning(push)
+#pragma warning(disable: 4100)
 #pragma warning(disable: 4244)
 #include <map>
 #include <list>
@@ -36,9 +37,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <lodepng.h>
-
 #include <tiny_obj_loader.h>
+
 #pragma warning(pop)
 
 using namespace std::literals;

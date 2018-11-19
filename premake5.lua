@@ -1,9 +1,8 @@
+require "deps/premake/stb"
 require "deps/premake/gsl"
 require "deps/premake/glm"
 require "deps/premake/glew"
 require "deps/premake/glfw"
-require "deps/premake/zlib"
-require "deps/premake/lodepng"
 require "deps/premake/tinyobjloader"
 
 workspace "model-viewer"
@@ -66,18 +65,15 @@ workspace "model-viewer"
 			flags { "FatalCompileWarnings" }
 		configuration {}
 		
+		stb.includes()
 		gsl.includes()
 		glm.includes()
 		
 		glew.import()
 		glfw.import()
-		zlib.import()
-		lodepng.import()
 		tinyobjloader.import()
 
 	group "Dependencies"
 		glew.project()
 		glfw.project()
-		zlib.project()
-		lodepng.project()
 		tinyobjloader.project()
