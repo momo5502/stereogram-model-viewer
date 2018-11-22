@@ -7,6 +7,7 @@ public:
 	~shader();
 
 	void use();
+	GLuint get();
 
 private:
 	GLuint vertex_shader = 0;

@@ -23,6 +23,8 @@ int main(int argc, char* argv[])
 
 		obj_loader loader(argv[1]);
 		model model = loader.get_model();
+		model.set_camera(&camera);
+		loader = {};
 
 		stereogram stereogram;
 		background background(0.0, 0.0, 0.0);

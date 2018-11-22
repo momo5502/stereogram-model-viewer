@@ -54,3 +54,8 @@ void shader::use()
 		glUseProgram(this->shader_program);
 	}
 }
+
+GLuint shader::get()
+{
+	return this->shader_program;
+}

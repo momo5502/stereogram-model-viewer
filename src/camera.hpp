@@ -33,6 +33,8 @@ public:
 
 	void paint() override;
 
+	glm::dvec3 get_position();
+
 private:
 	window* frame;
 

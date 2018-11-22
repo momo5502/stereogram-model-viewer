@@ -25,6 +25,11 @@ void camera::paint()
 	this->transform_world();
 }
 
+glm::dvec3 camera::get_position()
+{
+	return this->position;
+}
+
 glm::dvec3 camera::calculate_right_movement()
 {
 	auto right = glm::cross(this->direction, this->up);
