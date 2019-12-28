@@ -1,13 +1,15 @@
 #pragma once
 
+#define GLSL(version, shader)  "#version " #version "\n" #shader
+
 class shader
 {
 public:
 	shader(std::string vertex_source, std::string fragment_source, std::vector<std::string> attributes = {});
 	~shader();
 
-	void use();
-	GLuint get();
+	void use() const;
+	GLuint get() const;
 
 private:
 	GLuint vertex_shader = 0;

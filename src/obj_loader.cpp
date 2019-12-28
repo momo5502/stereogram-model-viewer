@@ -45,24 +45,48 @@ void obj_loader::load_textures()
 	this->textures.clear();
 	for (auto& material : this->materials)
 	{
-		int width = 0, height = 0, bpp = 0;
-		auto tex_path = this->file_path.parent_path() / material.ambient_texname;
-
-		uint8_t* rgb_image = stbi_load(tex_path.generic_string().data(), &width, &height, &bpp, 4);
-		auto _ = gsl::finally([rgb_image]()
-		{
-			stbi_image_free(rgb_image);
-		});
-
 		model::texture tex;
-		tex.width = width;
-		tex.height = height;
+		
+		auto tex_path = this->file_path.parent_path() / material.ambient_texname;
+		if(std::filesystem::is_regular_file(tex_path))
+		{
+			auto data = this->load_texture(tex_path, &tex.width, &tex.height);
+			tex.data.emplace_back(std::move(data));
+		}
+		else
+		{
+			const auto stem = (tex_path.parent_path() / tex_path.stem()).generic_string();
+			const auto extension = tex_path.extension().generic_string();
+			
+			for (auto i = 0; i < 6; ++i)
+			{
+				tex_path = stem + "_"s + std::to_string(i) + extension;
 
-		tex.data.resize(tex.width * tex.height * 4);
-		std::memmove(tex.data.data(), rgb_image, tex.width * tex.height * 4);
+				auto data = this->load_texture(tex_path, &tex.width, &tex.height);
+				tex.data.emplace_back(std::move(data));
+			}
+		}
 
 		this->textures.push_back(std::move(tex));
 	}
+}
+
+std::vector<unsigned char> obj_loader::load_texture(const std::filesystem::path& path, int* width, int* height) const
+{
+	auto bpp = 0;
+	auto* rgb_image = stbi_load(path.generic_string().data(), width, height, &bpp, 4);
+	auto _ = gsl::finally([rgb_image]()
+	{
+		stbi_image_free(rgb_image);
+	});
+
+	const auto size = *width * *height * 4;
+	std::vector<unsigned char> data;
+	data.resize(size);
+	
+	std::memmove(data.data(), rgb_image, size);
+
+	return data;
 }
 
 void obj_loader::sort_surfaces()

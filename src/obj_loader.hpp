@@ -31,6 +31,8 @@ private:
 	void load_textures();
 	void sort_surfaces();
 
+	std::vector<unsigned char> load_texture(const std::filesystem::path& path, int* width, int* height) const;
+
 	unsigned int load_index(const tinyobj::index_t& index);
 	unsigned int load_index(int vertex, int normal, int texture);
 };

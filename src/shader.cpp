@@ -47,7 +47,7 @@ shader::~shader()
 	glDeleteShader(this->vertex_shader);
 }
 
-void shader::use()
+void shader::use() const
 {
 	if (this->shader_program)
 	{
@@ -55,7 +55,7 @@ void shader::use()
 	}
 }
 
-GLuint shader::get()
+GLuint shader::get() const
 {
 	return this->shader_program;
 }

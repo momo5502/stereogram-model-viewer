@@ -9,14 +9,13 @@
 
 #include "obj_loader.hpp"
 
-
 int main(int argc, char* argv[])
 {
 	if (argc < 2) return 1;
 
 	try
 	{
-		window window(800, 600, "stereogram-model-viewer");
+		window window(800, 600, "model-viewer");
 		camera camera(&window);
 
 		auto list = window.get_painter_list();
@@ -45,4 +44,9 @@ int main(int argc, char* argv[])
 	}
 
 	return 0;
+}
+
+int __stdcall WinMain(HINSTANCE, HINSTANCE, char*, int)
+{
+	return main(__argc, __argv);
 }

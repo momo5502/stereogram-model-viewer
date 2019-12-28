@@ -31,6 +31,41 @@ model::model(const std::vector<model::vec<3>>& vertices,
 
 void model::create_texture(const model::texture& tex)
 {
+	if(tex.data.size() == 6)
+	{
+		this->create_texture_cube(tex);
+	}
+	else
+	{
+		this->create_texture_2d(tex);
+	}
+}
+
+void model::create_texture_cube(const model::texture& tex)
+{
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	GLuint texture = 0;
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+	glEnable(GL_TEXTURE_2D);
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	for (auto i = 0; i < 6; ++i)
+	{
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA8, tex.width, tex.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex.data[i].data());
+	}
+	
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+	this->texture_buffers.push_back(texture);
+}
+
+void model::create_texture_2d(const model::texture& tex)
+{
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	GLuint texture = 0;
@@ -42,7 +77,7 @@ void model::create_texture(const model::texture& tex)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, tex.width, tex.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex.data.data());
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, tex.width, tex.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex.data[0].data());
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -125,6 +160,8 @@ void model::paint()
 	glEnable(GL_TEXTURE_2D);
 	glDisable(GL_LIGHTING);
 	glEnable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
+	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	if (GetKeyState(VK_CAPITAL) & 0x0001)
@@ -145,25 +182,29 @@ void model::paint()
 	loc = glGetUniformLocation(program, "light_position");
 	if (loc != -1)
 	{
-		glUniform3f(loc, 0.0f, 10000.0f, 0.0f);
+		glUniform3f(loc, 300000.0f, 100000.0f, 300000.0f);
 	}
 
 	loc = glGetUniformLocation(program, "light_color_ambient");
 	if (loc != -1)
 	{
-		glUniform3f(loc, 0.0956127f, 0.0854841f, 0.0777573f);
+		const float scale = 0.8f;
+		glUniform3f(loc, 1.1996f * scale, 1.1996f * scale, 1.2104f * scale);
 	}
 
 	loc = glGetUniformLocation(program, "light_color_diffuse");
 	if (loc != -1)
 	{
-		glUniform3f(loc, 0.3f, 0.3f, 0.3f);
+		const float scale = 1.0f;
+		glUniform3f(loc, 0.3f * scale, 0.3f * scale, 0.3f * scale);
 	}
 
 	loc = glGetUniformLocation(program, "light_color_specular");
 	if (loc != -1)
 	{
-		glUniform3f(loc, 0.1f, 0.1f, 0.1f);
+		const float scale = 0.3f;
+
+		glUniform3f(loc, 0.3f * scale, 0.3f * scale, 0.3f * scale);
 	}
 
 	loc = glGetUniformLocation(program, "shininess");
@@ -192,133 +233,150 @@ void model::paint()
 
 void model::create_shader()
 {
-	static auto vertex_shader_source =
-		"#version 400\n"
+	static auto vertex_shader_source
+		= GLSL(120,
+		       in vec3 vertex_position;
+		       in vec2 vertex_uv;
+		       in vec3 vertex_normal;
 
-		"in vec3 vertex_position;"
-		"in vec2 vertex_uv;"
-		"in vec3 vertex_normal;"
+		       out vec2 uv;
+		       out vec3 normal;
+		       out vec3 vertex;
+		       out vec3 cam_pos;
+		       out vec3 light_pos;
+		       out vec3 light_color_specular_val;
+		       out vec3 light_color_ambient_val;
+		       out vec3 light_color_diffuse_val;
+		       out float shininess_val;
 
-		"out vec2 uv;"
-		"out vec3 normal;"
-		"out vec3 vertex;"
-		"out vec3 cam_pos;"
-		"out vec3 light_pos;"
-		"out vec3 light_color_specular_val;"
-		"out vec3 light_color_ambient_val;"
-		"out vec3 light_color_diffuse_val;"
-		"out float shininess_val;"
+		       uniform vec3 camera_position;
+		       uniform vec3 light_position;
+		       uniform vec3 light_color_specular;
+		       uniform vec3 light_color_ambient;
+		       uniform vec3 light_color_diffuse;
+		       uniform float shininess;
 
-		"uniform vec3 camera_position;"
-		"uniform vec3 light_position;"
-		"uniform vec3 light_color_specular;"
-		"uniform vec3 light_color_ambient;"
-		"uniform vec3 light_color_diffuse;"
-		"uniform float shininess;"
+		       void main(void)
+		       {
+		           uv = vertex_uv;
+				   normal = vertex_normal;
+				   vertex = vertex_position;
+				   cam_pos = camera_position;
+		           light_pos = light_position;
+				   light_color_specular_val = light_color_specular;
+				   light_color_ambient_val = light_color_ambient;
+				   light_color_diffuse_val = light_color_diffuse;
+				   shininess_val = shininess;
+			       gl_Position = gl_ModelViewProjectionMatrix * vec4(vertex_position, 1.0);
+		       }
+		);
 
-		"void main(void)"
-		"{"
-		"	uv = vertex_uv;"
-		"	normal = vertex_normal;"
-		"	vertex = vertex_position;"
-		"	cam_pos = camera_position;"
-		"	light_pos = light_position;"
-		"	light_color_specular_val = light_color_specular;"
-		"	light_color_ambient_val = light_color_ambient;"
-		"	light_color_diffuse_val = light_color_diffuse;"
-		"	shininess_val = shininess;"
-		"	gl_Position = gl_ModelViewProjectionMatrix * vec4(vertex_position, 1.0);"
-		"}";
+	static auto fragment_shader_source
+		= GLSL(120,
+		       in vec2 uv;
+		       in vec3 vertex;
+		       in vec3 normal;
+		       in vec3 cam_pos;
+		       in vec3 light_pos;
+		       in vec3 light_color_specular_val;
+		       in vec3 light_color_ambient_val;
+		       in vec3 light_color_diffuse_val;
+		       in float shininess_val;
 
-	static auto fragment_shader_source =
-		"in vec2 uv;"
-		"in vec3 vertex;"
-		"in vec3 normal;"
-		"in vec3 cam_pos;"
-		"in vec3 light_pos;"
-		"in vec3 light_color_specular_val;"
-		"in vec3 light_color_ambient_val;"
-		"in vec3 light_color_diffuse_val;"
-		"in float shininess_val;"
+		       uniform sampler2D texture_sampler;
 
-		"uniform sampler2D texture_sampler;"
+			   vec3 get_r()
+			   {
+				   vec3 light_direction = normalize(light_pos - vertex);
+				   return normalize((2 * dot(light_direction, normal)) * normal - light_direction);
+			   }
 
-		"float do_blinn_single_channel(float ks, float Iin, vec3 h)"
-		"{"
-		"	return Iin * ks * pow(dot(h, normal), shininess_val);"
-		"}"
+			   float get_rv_shiny()
+			   {
+				   vec3 r = get_r();
+				   vec3 cam_dir = normalize(cam_pos - vertex);
 
-		"vec3 do_blinn_specular(vec3 color)"
-		"{"
-		"	vec3 h = normalize(light_pos) + normalize(cam_pos);"
+				   float val = dot(r, cam_dir);
+				   return pow(val, shininess_val);
+			   }
 
-		"	color.r = do_blinn_single_channel(color.r, light_color_specular_val.r, h);"
-		"	color.g = do_blinn_single_channel(color.g, light_color_specular_val.g, h);"
-		"	color.b = do_blinn_single_channel(color.b, light_color_specular_val.b, h);"
-		"	return color;"
-		"}"
+		       vec3 do_blinn_specular(vec3 color)
+		       {
+				   float val = get_rv_shiny();
 
-		"vec3 do_blinn_ambient(vec3 color)"
-		"{"
-		"	return color + light_color_ambient_val;"
-		"}"
+				   color.r *= val * light_color_specular_val.r;
+				   color.g *= val * light_color_specular_val.g;
+				   color.b *= val * light_color_specular_val.b;
+		           return color;
+		       }
 
-		"vec3 do_blinn_diffuse(vec3 color)"
-		"{"
-		"	float scale = dot(normalize(light_pos), normalize(normal));"
+		       vec3 do_blinn_ambient(vec3 color)
+		       {
+				   color.r *= light_color_ambient_val.r;
+				   color.g *= light_color_ambient_val.g;
+				   color.b *= light_color_ambient_val.b;
+		       	
+				   return color;
+		       }
 
-		"	color.r = color.r * scale * light_color_diffuse_val.r;"
-		"	color.g = color.g * scale * light_color_diffuse_val.g;"
-		"	color.b = color.b * scale * light_color_diffuse_val.b;"
-		"	return color;"
-		"}"
+		       vec3 do_blinn_diffuse(vec3 color)
+		       {
+				   vec3 light_direction = normalize(light_pos - vertex);
+				   float scale = dot(light_direction, normalize(normal));
 
-		"vec3 do_blinn_shading(vec3 color)"
-		"{"
-		"	return do_blinn_ambient(color) + do_blinn_diffuse(color) + do_blinn_specular(color);"
-		"}"
+				   color.r *= scale * light_color_diffuse_val.r;
+				   color.g *= scale * light_color_diffuse_val.g;
+				   color.b *= scale * light_color_diffuse_val.b;
+				   return color;
+		       }
 
-		"void main(void)"
-		"{"
-		"	gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));"
-		"	gl_FragColor.rgb = do_blinn_shading(gl_FragColor.rgb);"
-		"}";
+		       vec3 do_blinn_shading(vec3 color)
+		       {
+				   return do_blinn_ambient(color) + do_blinn_diffuse(color) + do_blinn_specular(color);
+		       }
+
+		       void main(void)
+		       {
+				   gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));
+				   gl_FragColor.rgb = do_blinn_shading(gl_FragColor.rgb);
+		       };
+		);
 
 	this->shader_program = std::make_unique<shader>(vertex_shader_source, fragment_shader_source, std::vector<std::string>{ "vertex_position", "vertex_uv", "vertex_normal" });
 
 
+	static auto vertex_shader_source_no
+		= GLSL(120,
+		       in vec3 vertex_position;
+		       in vec2 vertex_uv;
+		       in vec3 vertex_normal;
 
+		       out vec2 uv;
+		       out vec3 normal;
+		       out vec3 vertex;
 
-	static auto vertex_shader_source_no =
-		"#version 400\n"
+		       void main(void)
+		       {
+		           uv = vertex_uv;
+		           normal = vertex_normal;
+		           vertex = vertex_position;
+		           gl_Position = gl_ModelViewProjectionMatrix * vec4(vertex_position, 1.0);
+		       }
+		);
 
-		"in vec3 vertex_position;"
-		"in vec2 vertex_uv;"
-		"in vec3 vertex_normal;"
+	static auto fragment_shader_source_no
+		= GLSL(120,
+		       in vec2 uv;
+		       in vec3 vertex;
+		       in vec3 normal;
 
-		"out vec2 uv;"
-		"out vec3 normal;"
-		"out vec3 vertex;"
+		       uniform sampler2D texture_sampler;
 
-		"void main(void)"
-		"{"
-		"	uv = vertex_uv;"
-		"	normal = vertex_normal;"
-		"	vertex = vertex_position;"
-		"	gl_Position = gl_ModelViewProjectionMatrix * vec4(vertex_position, 1.0);"
-		"}";
-
-	static auto fragment_shader_source_no =
-		"in vec2 uv;"
-		"in vec3 vertex;"
-		"in vec3 normal;"
-
-		"uniform sampler2D texture_sampler;"
-
-		"void main(void)"
-		"{"
-		"	gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));"
-		"}";
+		       void main(void)
+		       {
+		           gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));
+		       }
+		);
 
 	this->shader_program_no = std::make_unique<shader>(vertex_shader_source_no, fragment_shader_source_no, std::vector<std::string>{ "vertex_position", "vertex_uv", "vertex_normal" });
 }

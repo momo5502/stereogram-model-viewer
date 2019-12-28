@@ -11,9 +11,9 @@ public:
 	class texture
 	{
 	public:
-		std::vector<unsigned char> data;
-		unsigned width;
-		unsigned height;
+		std::vector<std::vector<unsigned char>> data;
+		int width{};
+		int height{};
 	};
 
 	template<size_t len>
@@ -72,5 +72,7 @@ private:
 		const std::vector<model::vec<2>>& uvs);
 	void create_index_buffer(const surface& surf);
 	void create_texture(const texture& tex);
+	void create_texture_2d(const texture& tex);
+	void create_texture_cube(const texture& tex);
 	void create_shader();
 };
