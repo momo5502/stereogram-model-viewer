@@ -8,6 +8,22 @@ class camera;
 class model : public paintable
 {
 public:
+	class light
+	{
+	public:
+		light(glm::vec3 origin_, glm::vec3 color_) : origin(origin_), color(color_) {}
+		~light()
+		{
+			if (depthMap) {
+				glDeleteTextures(1, &depthMap);
+			}
+		}
+
+		glm::vec3 origin;
+		glm::vec3 color;
+		unsigned int depthMap = 0;
+	};
+	
 	class texture
 	{
 	public:
@@ -52,8 +68,6 @@ private:
 		int count = 0;
 	};
 
-	unsigned int depthMap;
-
 	GLuint vertex_array = 0;
 	GLuint vertex_buffer = 0;
 	GLuint normal_buffer = 0;
@@ -63,6 +77,8 @@ private:
 	std::vector<faces> faces_buffers;
 
 	std::vector<int> num_faces;
+
+	std::vector<std::unique_ptr<light>> lights;
 
 	std::unique_ptr<shader> shader_program;
 	std::unique_ptr<shader> shader_program_no;
@@ -79,5 +95,5 @@ private:
 	void create_texture_cube(const texture& tex);
 	void create_shader();
 
-	void generate_lightmap();
+	void generate_lightmap(light& light);
 };

@@ -5,7 +5,8 @@
 class shader
 {
 public:
-	shader(std::string vertex_source, std::string fragment_source, std::vector<std::string> attributes = {});
+	shader(const std::string& vertex_source, const std::string& fragment_source, const std::vector<std::string>& attributes = {});
+	shader(const std::string& vertex_source, const std::string& fragment_source, const std::string& geometry_source, const std::vector<std::string>& attributes = {});
 	~shader();
 
 	void use() const;

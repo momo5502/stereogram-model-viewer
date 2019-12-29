@@ -13,6 +13,8 @@ int main(int argc, char* argv[])
 {
 	if (argc < 2) return 1;
 
+	srand(int(time(nullptr)));
+
 	try
 	{
 		window window(800, 600, "model-viewer");

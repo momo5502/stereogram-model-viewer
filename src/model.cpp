@@ -4,7 +4,7 @@
 #include "model.hpp"
 #include "context_saver.hpp"
 
-glm::mat4 lightSpaceMatrix;
+#define MAX_LIGHTS 5
 
 model::model(const std::vector<model::vec<3>>& vertices,
 	const std::vector<model::vec<3>>& normals,
@@ -13,6 +13,8 @@ model::model(const std::vector<model::vec<3>>& vertices,
 	const std::vector<texture>& textures)
 {
 	context_saver _;
+
+	//lights.push_back(std::make_unique<light>(glm::vec3(679.0f, 967.0f, 114.0f), glm::vec3(0.956127f, 0.854841f, 0.777573f)));
 
 	this->create_vertex_buffer(vertices, normals, uvs);
 
@@ -155,12 +157,29 @@ void model::set_camera(camera* _cam)
 
 void model::paint()
 {
-	static bool l = false;
-	if(!l)
+	static auto last_pressed = false;
+	if (GetKeyState(VK_RETURN) & 0x8000)
 	{
-		l = true;
-		this->generate_lightmap();
-		return;
+		if (!last_pressed)
+		{
+			last_pressed = true;
+
+			while (lights.size() >= MAX_LIGHTS) {
+				lights.erase(lights.begin());
+			}
+
+			lights.push_back(std::make_unique<light>(this->cam->get_position(), glm::vec3((rand() & 1) * 1.0f , (rand() & 1) * 1.0f, (rand() & 1) * 1.0f)));
+		}
+	} else {
+		last_pressed = false;
+	}
+
+	for(auto& light : lights)
+	{
+		if(!light->depthMap) {
+			this->generate_lightmap(*light);
+			return;
+		}
 	}
 	
 	glColor3f(1, 1, 1);
@@ -182,44 +201,36 @@ void model::paint()
 	GLint program;
 	glGetIntegerv(GL_CURRENT_PROGRAM, &program);
 
-	GLint loc = glGetUniformLocation(program, "lightSpaceMatrix");
-	if (loc != -1)
-	{
-		glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-	}
-
-	loc = glGetUniformLocation(program, "camera_position");
+	GLint loc = glGetUniformLocation(program, "camera_position");
 	if (loc != -1)
 	{
 		glm::vec3 pos = this->cam->get_position();
 		glUniform3f(loc, pos[0], pos[1], pos[2]);
 	}
-
-	loc = glGetUniformLocation(program, "light_position");
-	if (loc != -1)
-	{
-		const float scale = 10.0f;
-		glUniform3f(loc, 679.0f * scale, 967.0f * scale, 114.0f * scale);
-	}
-
+	
 	loc = glGetUniformLocation(program, "light_color_ambient");
 	if (loc != -1)
 	{
-		const float scale = 0.3f;
-		glUniform3f(loc, 0.956127f * scale, 0.854841f * scale, 0.777573f * scale);
-	}
-
-	loc = glGetUniformLocation(program, "light_color_diffuse");
-	if (loc != -1)
-	{
-		const float scale = 1.0f;
-		glUniform3f(loc, 0.956127f * scale, 0.854841f * scale, 0.777573f * scale);
-	}
-
-	loc = glGetUniformLocation(program, "light_color_specular");
-	if (loc != -1)
-	{
+		glm::vec3 pos = this->cam->get_position();
 		glUniform3f(loc, 0.5f, 0.5f, 0.5f);
+	}
+	
+	loc = glGetUniformLocation(program, "ambient_intensity");
+	if (loc != -1)
+	{
+		glUniform1f(loc, 0.4f);
+	}
+
+	loc = glGetUniformLocation(program, "diffuse_intensity");
+	if (loc != -1)
+	{
+		glUniform1f(loc, 1.0f);
+	}
+
+	loc = glGetUniformLocation(program, "specular_intensity");
+	if (loc != -1)
+	{
+		glUniform1f(loc, 1.0f);
 	}
 
 	loc = glGetUniformLocation(program, "shininess");
@@ -228,25 +239,39 @@ void model::paint()
 		glUniform1f(loc, 64.0f);
 	}
 
-	loc = glGetUniformLocation(program, "depth_map");
-	if (loc != -1)
-	{
-		glActiveTexture(GL_TEXTURE0 + 0);
-		glBindTexture(GL_TEXTURE_2D, this->depthMap);
-		glUniform1i(loc, 0);
-	}
-
 	loc = glGetUniformLocation(program, "texture_sampler");
 	if (loc != -1)
 	{
 		glUniform1i(loc, 0);
 	}
-	
-	loc = glGetUniformLocation(program, "depth_map");
+
+	const int light_count = std::min(int(lights.size()), MAX_LIGHTS);
+	loc = glGetUniformLocation(program, "light_count");
 	if (loc != -1)
 	{
-		glUniform1i(loc, 1);
+		glUniform1i(loc, light_count);
 	}
+
+	for (int i = 0; i < light_count; ++i) {
+		loc = glGetUniformLocation(program, ("depth_map[" + std::to_string(i) + "]").data());
+		if (loc != -1)
+		{
+			glUniform1i(loc, 1 + i);
+		}
+
+		loc = glGetUniformLocation(program, ("light_pos[" + std::to_string(i) + "]").data());
+		if (loc != -1)
+		{
+			glUniform3f(loc, lights[i]->origin[0], lights[i]->origin[1], lights[i]->origin[2]);
+		}
+
+		loc = glGetUniformLocation(program, ("light_color[" + std::to_string(i) + "]").data());
+		if (loc != -1)
+		{
+			glUniform3f(loc, lights[i]->color[0], lights[i]->color[1], lights[i]->color[2]);
+		}
+	}
+
 	
 	glBindVertexArray(this->vertex_array);
 	glEnableVertexAttribArray(0);
@@ -257,8 +282,12 @@ void model::paint()
 	{
 		glActiveTexture(GL_TEXTURE0 + 0);
 		glBindTexture(GL_TEXTURE_2D, this->texture_buffers[i]);
-		glActiveTexture(GL_TEXTURE0 + 1);
-		glBindTexture(GL_TEXTURE_2D, this->depthMap);
+
+		for(int j = 0; j < light_count; ++j)
+		{
+			glActiveTexture(GL_TEXTURE0 + 1 + j);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, lights[j]->depthMap);
+		}
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->faces_buffers[i].index_buffer);
 		glDrawElements(GL_TRIANGLES, this->faces_buffers[i].count, GL_UNSIGNED_INT, nullptr);
@@ -280,34 +309,18 @@ void model::create_shader()
 		       out vec2 uv;
 		       out vec3 normal;
 		       out vec3 vertex;
-		       out vec4 vertex_light;
 		       out vec3 cam_pos;
-		       out vec3 light_pos;
-		       out vec3 light_color_specular_val;
-		       out vec3 light_color_ambient_val;
-		       out vec3 light_color_diffuse_val;
 		       out float shininess_val;
 
 		       uniform vec3 camera_position;
-		       uniform vec3 light_position;
-		       uniform vec3 light_color_specular;
-		       uniform vec3 light_color_ambient;
-		       uniform vec3 light_color_diffuse;
 		       uniform float shininess;
-
-			   uniform mat4 lightSpaceMatrix;
 
 		       void main(void)
 		       {
 		           uv = vertex_uv;
 				   normal = normalize(vertex_normal);
 				   vertex = vertex_position;
-				   vertex_light = lightSpaceMatrix * vec4(vertex_position, 1.0);
 				   cam_pos = camera_position;
-				   light_pos = light_position;
-				   light_color_specular_val = light_color_specular;
-				   light_color_ambient_val = light_color_ambient;
-				   light_color_diffuse_val = light_color_diffuse;
 				   shininess_val = shininess;
 			       gl_Position = gl_ModelViewProjectionMatrix * vec4(vertex_position, 1.0);
 		       }
@@ -319,87 +332,136 @@ void model::create_shader()
 		       in vec3 vertex;
 		       in vec3 normal;
 		       in vec3 cam_pos;
-		       in vec3 light_pos;
-		       in vec3 light_color_specular_val;
-		       in vec3 light_color_ambient_val;
-		       in vec3 light_color_diffuse_val;
+		       uniform vec3 light_pos[5];
 		       in float shininess_val;
-			   in vec4 vertex_light;
 
 		       uniform sampler2D texture_sampler;
-		       uniform sampler2D depth_map;
+		       uniform samplerCube depth_map[5];
 
-			   float ShadowCalculation(vec4 fragPosLightSpace)
+			   uniform vec3 light_color_ambient;
+			   uniform vec3 light_color[5];
+			   uniform float ambient_intensity;
+			   uniform float diffuse_intensity;
+			   uniform float specular_intensity;
+
+			   uniform int light_count;
+
+			   float far_plane = 5000.0;
+
+			   vec3 sampleOffsetDirections[20] = vec3[]
+			   (
+				   vec3(1, 1, 1), vec3(1, -1, 1), vec3(-1, -1, 1), vec3(-1, 1, 1),
+				   vec3(1, 1, -1), vec3(1, -1, -1), vec3(-1, -1, -1), vec3(-1, 1, -1),
+				   vec3(1, 1, 0), vec3(1, -1, 0), vec3(-1, -1, 0), vec3(-1, 1, 0),
+				   vec3(1, 0, 1), vec3(-1, 0, 1), vec3(1, 0, -1), vec3(-1, 0, -1),
+				   vec3(0, 1, 1), vec3(0, -1, 1), vec3(0, -1, -1), vec3(0, 1, -1)
+			   );
+
+			   float ShadowCalculationComplex(int ln)
 			   {
-				   vec3 light_direction = normalize(light_pos - vertex);
-				   vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-				   projCoords = projCoords * 0.5 + 0.5;
-
-				   if (projCoords.z > 1.0) return 0.0;
-			   	
-				   float closestDepth = texture(depth_map, projCoords.xy).r;
-				   float currentDepth = projCoords.z;
-			   	
-				   float bias = max(0.05 * (1.0 - dot(normal, light_direction)), 0.005);
+				   vec3 fragToLight = vertex - light_pos[ln];
+				   // use the light to fragment vector to sample from the depth map    
+				   float closestDepth = texture(depth_map[ln], fragToLight).r;
+				   // it is currently in linear range between [0,1]. Re-transform back to original value
+				   closestDepth *= far_plane;
+				   // now get current linear depth as the length between the fragment and light position
+				   float currentDepth = length(fragToLight);
+				   // now test for shadows
 
 				   float shadow = 0.0;
-				   vec2 texelSize = 1.0 / textureSize(depth_map, 0);
-			   	
-				   for (int x = -1; x <= 1; ++x)
+				   float bias = 10.0;
+				   int samples = 20;
+				   float viewDistance = length(cam_pos - vertex);
+				   float diskRadius = (1.0 + (viewDistance / far_plane)) / 25.0;
+				   for (int i = 0; i < samples; ++i)
 				   {
-					   for (int y = -1; y <= 1; ++y)
-					   {
-						   float pcfDepth = texture(depth_map, projCoords.xy + vec2(x, y) * texelSize).r;
-						   shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-					   }
+					   float closestDepth = texture(depth_map[ln], fragToLight + sampleOffsetDirections[i] * diskRadius).r;
+					   closestDepth *= far_plane;   // Undo mapping [0;1]
+					   if (currentDepth - bias > closestDepth)
+						   shadow += 1.0;
 				   }
-				   shadow /= 9.0;
+				   shadow /= float(samples);
+			   	
+				   return shadow;
+			   }
+
+			   float ShadowCalculationSimple(int ln)
+			   {
+				   // get vector between fragment position and light position
+				   vec3 fragToLight = vertex - light_pos[ln];
+				   // use the light to fragment vector to sample from the depth map    
+				   float closestDepth = texture(depth_map[ln], fragToLight).r;
+				   // it is currently in linear range between [0,1]. Re-transform back to original value
+				   closestDepth *= far_plane;
+				   // now get current linear depth as the length between the fragment and light position
+				   float currentDepth = length(fragToLight);
+				   // now test for shadows
+				   float bias = 10.0;
+				   float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
 
 				   return shadow;
 			   }
 
-			   vec3 get_reflect_dir()
+			   vec3 get_reflect_dir(int ln)
 			   {
-				   vec3 light_direction = normalize(light_pos - vertex);
+				   vec3 light_direction = normalize(light_pos[ln] - vertex);
 				   return reflect(-light_direction, normal);
 			   }
 
-			   float get_specular_strength()
+			   float get_specular_strength(int ln)
 			   {
-				   vec3 reflect_dir = get_reflect_dir();
+				   vec3 reflect_dir = get_reflect_dir(ln);
 				   vec3 cam_dir = normalize(cam_pos - vertex);
 
 				   float val = max(dot(reflect_dir, cam_dir), 0.0);
 				   return pow(val, shininess_val);
 			   }
 
-		       vec3 do_specular()
+		       vec3 do_specular(int ln)
 		       {
-				   float val = get_specular_strength();
-		           return val * light_color_specular_val;
+				   float val = get_specular_strength(ln);
+		           return val * light_color[ln] * diffuse_intensity;
 		       }
 
 		       vec3 do_ambient()
 		       {
-				   return light_color_ambient_val;
+				   return light_color_ambient * ambient_intensity;
 		       }
 
-		       vec3 do_diffuse()
+		       vec3 do_diffuse(int ln)
 		       {
-				   vec3 light_direction = normalize(light_pos - vertex);
+				   vec3 light_direction = normalize(light_pos[ln] - vertex);
 				   float scale = max(dot(light_direction, normal), 0.0);
-				   return scale * light_color_diffuse_val;
+				   return scale * light_color[ln] * specular_intensity;
 		       }
+
+			   vec3 do_light(int ln)
+			   {
+				   //float shadow = ShadowCalculationComplex(ln);
+				   float shadow = ShadowCalculationSimple(ln);
+				   float scale = (1.0 - shadow);
+				   if (scale == 0.0) return vec3(0.0);
+				   return scale * (do_diffuse(ln) + do_specular(ln));
+			   }
 
 		       vec3 do_shading(vec3 color)
 		       {
-				   float shadow = ShadowCalculation(vertex_light);
-				   return color * (do_ambient() + (1.0 - shadow) * (do_diffuse() + do_specular()));
+				   vec3 _light_color = vec3(0.0);
+
+			   		for(int i = 0; i < light_count; ++i) {
+						_light_color += do_light(i);
+			   		}
+			   	
+				   return color * (do_ambient() + _light_color);
 		       }
 
 		       void main(void)
 		       {
 				   gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));
+
+				   //vec2 mapCoord = 2.0 * uv - 1.0;
+				   //gl_FragColor = texture(depth_map, vec3(mapCoord.xy, 1.0));
+			   	
 				   gl_FragColor.rgb = do_shading(gl_FragColor.rgb);
 		       };
 		);
@@ -443,88 +505,150 @@ void model::create_shader()
 	this->shader_program_no = std::make_unique<shader>(vertex_shader_source_no, fragment_shader_source_no, std::vector<std::string>{ "vertex_position", "vertex_uv", "vertex_normal" });
 
 	static auto vertex_shader_shadow
-		= GLSL(130,
+		= GLSL(330,
 			in vec3 vertex_position;
-	in vec2 vertex_uv;
-	in vec3 vertex_normal;
+			in vec2 vertex_uv;
+			in vec3 vertex_normal;
 
-	uniform mat4 lightSpaceMatrix;
-
-	void main(void)
-	{
-		gl_Position = lightSpaceMatrix * vec4(vertex_position, 1.0);
-	}
+			void main(void)
+			{
+				gl_Position = vec4(vertex_position, 1.0);
+			}
 	);
 
 	static auto fragment_shader_shadow
-		= GLSL(130,
+		= GLSL(330,
+			in vec4 FragPos;
 
-	uniform sampler2D texture_sampler;
+			uniform vec3 light_position;
+			uniform float far_plane;
 
-	void main(void)
-	{
-		//gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));
-	}
+			void main()
+			{
+				// get distance between fragment and light source
+				float lightDistance = length(FragPos.xyz - light_position);
+
+				// map to [0;1] range by dividing by far_plane
+				lightDistance = lightDistance / far_plane;
+
+				// write this as modified depth
+				gl_FragDepth = lightDistance;
+			}
 	);
 
-	this->shadow_map = std::make_unique<shader>(vertex_shader_shadow, fragment_shader_shadow, std::vector<std::string>{ "vertex_position", "vertex_uv", "vertex_normal" });
+	static auto geometry_shader_shadow
+		= GLSL(330,
+			layout(triangles) in;
+			layout(triangle_strip, max_vertices = 18) out;
+
+			uniform mat4 lightSpaceMatrix[6];
+
+			out vec4 FragPos; // FragPos from GS (output per emitvertex)
+
+			void main()
+			{
+				for (int face = 0; face < 6; ++face)
+				{
+					gl_Layer = face; // built-in variable that specifies to which face we render.
+					for (int i = 0; i < 3; ++i) // for each triangle's vertices
+					{
+						FragPos = gl_in[i].gl_Position;
+						gl_Position = lightSpaceMatrix[face] * FragPos;
+						EmitVertex();
+					}
+					EndPrimitive();
+				}
+			}
+	);
+	
+	this->shadow_map = std::make_unique<shader>(vertex_shader_shadow, fragment_shader_shadow, geometry_shader_shadow, std::vector<std::string>{ "vertex_position", "vertex_uv", "vertex_normal" });
 }
 
-void model::generate_lightmap()
+void model::generate_lightmap(model::light& light)
 {
 	unsigned int depthMapFBO;
 	glGenFramebuffers(1, &depthMapFBO);
 
-	const unsigned int SHADOW_WIDTH = 1024 * 2 * 2 * 2;
+	const unsigned int SHADOW_WIDTH = 1024 * 4;
 	const unsigned int SHADOW_HEIGHT = SHADOW_WIDTH;
 
-	glGenTextures(1, &depthMap);
-	glBindTexture(GL_TEXTURE_2D, depthMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-		SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
+	if(!light.depthMap)
+	{
+		glGenTextures(1, &light.depthMap);
+	}
 	
+	glBindTexture(GL_TEXTURE_CUBE_MAP, light.depthMap);
+	for (unsigned int i = 0; i < 6; ++i)
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT,
+			SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+
+	float aspect = (float)SHADOW_WIDTH / (float)SHADOW_HEIGHT;
+	float _near = 1.0f;
+	float _far = 5000.0f;
+	glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), aspect, _near, _far);
+
+	std::vector<glm::mat4> lightSpaceMatrix;
+	lightSpaceMatrix.push_back(shadowProj *
+		glm::lookAt(light.origin, light.origin + glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
+	lightSpaceMatrix.push_back(shadowProj *
+		glm::lookAt(light.origin, light.origin + glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
+	lightSpaceMatrix.push_back(shadowProj *
+		glm::lookAt(light.origin, light.origin + glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0)));
+	lightSpaceMatrix.push_back(shadowProj *
+		glm::lookAt(light.origin, light.origin + glm::vec3(0.0, -1.0, 0.0), glm::vec3(0.0, 0.0, -1.0)));
+	lightSpaceMatrix.push_back(shadowProj *
+		glm::lookAt(light.origin, light.origin + glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, -1.0, 0.0)));
+	lightSpaceMatrix.push_back(shadowProj *
+		glm::lookAt(light.origin, light.origin + glm::vec3(0.0, 0.0, -1.0), glm::vec3(0.0, -1.0, 0.0)));
+
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, light.depthMap, 0);
+
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	float near_plane = 1.0f, far_plane = 5000.0f;
-	float radius = 4000.0f;
-	glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, near_plane, far_plane);
-
-	glm::mat4 lightView = glm::lookAt(glm::vec3(679.0f, 967.0f, 114.0f),
-		glm::vec3(0.0f, 0.0f, 0.0f),
-		glm::vec3(0.0f, 1.0f, 0.0f));
-
-	lightSpaceMatrix = lightProjection * lightView;
 
 	GLint m_viewport[4];
 	glGetIntegerv(GL_VIEWPORT, m_viewport);
 	glCullFace(GL_FRONT);
 	const auto _ = gsl::finally([&m_viewport]()
-	{
-		glCullFace(GL_BACK);
-		glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
-	});
+		{
+			glCullFace(GL_BACK);
+			glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+		});
 
 	this->shadow_map->use();
 
 	GLint program;
 	glGetIntegerv(GL_CURRENT_PROGRAM, &program);
 
-	GLint loc = glGetUniformLocation(program, "lightSpaceMatrix");
+	if (glGetUniformLocation(program, "lightSpaceMatrix[0]") != -1)
+	{
+		glUniformMatrix4fv(glGetUniformLocation(program, "lightSpaceMatrix[0]"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix[0]));
+		glUniformMatrix4fv(glGetUniformLocation(program, "lightSpaceMatrix[1]"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix[1]));
+		glUniformMatrix4fv(glGetUniformLocation(program, "lightSpaceMatrix[2]"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix[2]));
+		glUniformMatrix4fv(glGetUniformLocation(program, "lightSpaceMatrix[3]"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix[3]));
+		glUniformMatrix4fv(glGetUniformLocation(program, "lightSpaceMatrix[4]"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix[4]));
+		glUniformMatrix4fv(glGetUniformLocation(program, "lightSpaceMatrix[5]"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix[5]));
+	}
+
+	GLint loc = glGetUniformLocation(program, "light_position");
 	if (loc != -1)
 	{
-		glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+		glUniform3f(loc, light.origin[0], light.origin[1], light.origin[2]);
+	}
+
+	loc = glGetUniformLocation(program, "far_plane");
+	if (loc != -1)
+	{
+		glUniform1f(loc, _far);
 	}
 
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
@@ -535,7 +659,7 @@ void model::generate_lightmap()
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	
+
 	glBindVertexArray(this->vertex_array);
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
@@ -543,8 +667,6 @@ void model::generate_lightmap()
 
 	for (size_t i = 0; i < this->faces_buffers.size() && i < this->texture_buffers.size(); ++i)
 	{
-		glBindTexture(GL_TEXTURE_2D, this->texture_buffers[i]);
-
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->faces_buffers[i].index_buffer);
 		glDrawElements(GL_TRIANGLES, this->faces_buffers[i].count, GL_UNSIGNED_INT, nullptr);
 	}
@@ -554,7 +676,8 @@ void model::generate_lightmap()
 	glDisableVertexAttribArray(2);
 
 	glfwSwapBuffers(*this->cam->get_frame());
-	
-	
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glDeleteFramebuffers(1, &depthMapFBO);
 }
