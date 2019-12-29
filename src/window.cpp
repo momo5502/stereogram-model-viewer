@@ -40,12 +40,12 @@ void window::init_glew()
 	glDepthFunc(GL_LESS);
 }
 
-void window::create(int width, int height, const std::string& title)
+void window::create(const int width, const int height, const std::string& title)
 {
 	glfwWindowHint(GLFW_SAMPLES, 4);
 	glfwWindowHint(GLFW_DEPTH_BITS, 32);
 
-	this->handle = glfwCreateWindow(width, height, title.data(), NULL, NULL);
+	this->handle = glfwCreateWindow(width, height, title.data(), nullptr, nullptr);
 	if (!this->handle)
 	{
 		throw std::runtime_error("Unable to create window");
@@ -70,12 +70,12 @@ void window::create(int width, int height, const std::string& title)
 	glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
 }
 
-void window::size_callback(int width, int height)
+void window::size_callback(const int width, const int height)
 {
 	glViewport(0, 0, width, height);
 }
 
-void window::size_callback_static(GLFWwindow* _window, int width, int height)
+void window::size_callback_static(GLFWwindow* _window, const int width, const int height)
 {
 	reinterpret_cast<window*>(glfwGetWindowUserPointer(_window))->size_callback(width, height);
 }
@@ -102,14 +102,19 @@ bool window::is_key_pressed(int key)
 	return glfwGetKey(*this, key) == GLFW_PRESS;
 }
 
-long long window::get_last_frame_time()
+long long window::get_last_frame_time() const
 {
 	return this->last_frame_time;
 }
 
+void window::set_title(const std::string& title)
+{
+	glfwSetWindowTitle(*this, title.data());
+}
+
 void window::update_frame_times()
 {
-	auto now = std::chrono::system_clock::now();
+	const auto now = std::chrono::system_clock::now();
 	this->last_frame_time = std::chrono::duration_cast<std::chrono::microseconds>(now - this->last_frame).count();
 	this->last_frame = now;
 }

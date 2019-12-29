@@ -12,7 +12,5 @@ public:
 	GLuint get() const;
 
 private:
-	GLuint vertex_shader = 0;
-	GLuint fragment_shader = 0;
 	GLuint shader_program = 0;
 };

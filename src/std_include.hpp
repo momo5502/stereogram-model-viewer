@@ -15,6 +15,7 @@
 
 #pragma warning(push)
 #pragma warning(disable: 4100)
+#pragma warning(disable: 4127)
 #pragma warning(disable: 4244)
 #include <map>
 #include <list>

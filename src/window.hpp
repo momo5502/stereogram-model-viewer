@@ -16,7 +16,9 @@ public:
 
 	bool is_key_pressed(int key);
 
-	long long get_last_frame_time();
+	long long get_last_frame_time() const;
+
+	void set_title(const std::string& title);
 
 private:
 	GLFWwindow* handle = nullptr;

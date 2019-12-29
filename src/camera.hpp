@@ -33,7 +33,9 @@ public:
 
 	void paint() override;
 
-	glm::dvec3 get_position();
+	glm::dvec3 get_position() const;
+
+	window* get_frame() const;
 
 private:
 	window* frame;
@@ -55,7 +57,7 @@ private:
 
 	void transform_world();
 
-	glm::dvec3 calculate_right_movement();
+	glm::dvec3 calculate_right_movement() const;
 	glm::dvec3 calculate_forward_movement(bool normalize = true);
 
 	double enclose_vertical_angle(double pitch);

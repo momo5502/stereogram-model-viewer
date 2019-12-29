@@ -52,6 +52,8 @@ private:
 		int count = 0;
 	};
 
+	unsigned int depthMap;
+
 	GLuint vertex_array = 0;
 	GLuint vertex_buffer = 0;
 	GLuint normal_buffer = 0;
@@ -64,6 +66,7 @@ private:
 
 	std::unique_ptr<shader> shader_program;
 	std::unique_ptr<shader> shader_program_no;
+	std::unique_ptr<shader> shadow_map;
 
 	camera* cam = nullptr;
 
@@ -75,4 +78,6 @@ private:
 	void create_texture_2d(const texture& tex);
 	void create_texture_cube(const texture& tex);
 	void create_shader();
+
+	void generate_lightmap();
 };

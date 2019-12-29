@@ -4,6 +4,8 @@
 #include "model.hpp"
 #include "context_saver.hpp"
 
+glm::mat4 lightSpaceMatrix;
+
 model::model(const std::vector<model::vec<3>>& vertices,
 	const std::vector<model::vec<3>>& normals,
 	const std::vector<model::vec<2>>& uvs,
@@ -153,6 +155,14 @@ void model::set_camera(camera* _cam)
 
 void model::paint()
 {
+	static bool l = false;
+	if(!l)
+	{
+		l = true;
+		this->generate_lightmap();
+		return;
+	}
+	
 	glColor3f(1, 1, 1);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glCullFace(GL_FRONT_AND_BACK);
@@ -172,7 +182,13 @@ void model::paint()
 	GLint program;
 	glGetIntegerv(GL_CURRENT_PROGRAM, &program);
 
-	GLint loc = glGetUniformLocation(program, "camera_position");
+	GLint loc = glGetUniformLocation(program, "lightSpaceMatrix");
+	if (loc != -1)
+	{
+		glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+	}
+
+	loc = glGetUniformLocation(program, "camera_position");
 	if (loc != -1)
 	{
 		glm::vec3 pos = this->cam->get_position();
@@ -182,37 +198,56 @@ void model::paint()
 	loc = glGetUniformLocation(program, "light_position");
 	if (loc != -1)
 	{
-		glUniform3f(loc, 300000.0f, 100000.0f, 300000.0f);
+		const float scale = 10.0f;
+		glUniform3f(loc, 679.0f * scale, 967.0f * scale, 114.0f * scale);
 	}
 
 	loc = glGetUniformLocation(program, "light_color_ambient");
 	if (loc != -1)
 	{
-		const float scale = 0.8f;
-		glUniform3f(loc, 1.1996f * scale, 1.1996f * scale, 1.2104f * scale);
+		const float scale = 0.3f;
+		glUniform3f(loc, 0.956127f * scale, 0.854841f * scale, 0.777573f * scale);
 	}
 
 	loc = glGetUniformLocation(program, "light_color_diffuse");
 	if (loc != -1)
 	{
 		const float scale = 1.0f;
-		glUniform3f(loc, 0.3f * scale, 0.3f * scale, 0.3f * scale);
+		glUniform3f(loc, 0.956127f * scale, 0.854841f * scale, 0.777573f * scale);
 	}
 
 	loc = glGetUniformLocation(program, "light_color_specular");
 	if (loc != -1)
 	{
-		const float scale = 0.3f;
-
-		glUniform3f(loc, 0.3f * scale, 0.3f * scale, 0.3f * scale);
+		glUniform3f(loc, 0.5f, 0.5f, 0.5f);
 	}
 
 	loc = glGetUniformLocation(program, "shininess");
 	if (loc != -1)
 	{
-		glUniform1f(loc, 1.0f);
+		glUniform1f(loc, 64.0f);
 	}
 
+	loc = glGetUniformLocation(program, "depth_map");
+	if (loc != -1)
+	{
+		glActiveTexture(GL_TEXTURE0 + 0);
+		glBindTexture(GL_TEXTURE_2D, this->depthMap);
+		glUniform1i(loc, 0);
+	}
+
+	loc = glGetUniformLocation(program, "texture_sampler");
+	if (loc != -1)
+	{
+		glUniform1i(loc, 0);
+	}
+	
+	loc = glGetUniformLocation(program, "depth_map");
+	if (loc != -1)
+	{
+		glUniform1i(loc, 1);
+	}
+	
 	glBindVertexArray(this->vertex_array);
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
@@ -220,10 +255,13 @@ void model::paint()
 
 	for (size_t i = 0; i < this->faces_buffers.size() && i < this->texture_buffers.size(); ++i)
 	{
+		glActiveTexture(GL_TEXTURE0 + 0);
 		glBindTexture(GL_TEXTURE_2D, this->texture_buffers[i]);
+		glActiveTexture(GL_TEXTURE0 + 1);
+		glBindTexture(GL_TEXTURE_2D, this->depthMap);
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->faces_buffers[i].index_buffer);
-		glDrawElements(GL_TRIANGLES, this->faces_buffers[i].count, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, this->faces_buffers[i].count, GL_UNSIGNED_INT, nullptr);
 	}
 
 	glDisableVertexAttribArray(0);
@@ -234,7 +272,7 @@ void model::paint()
 void model::create_shader()
 {
 	static auto vertex_shader_source
-		= GLSL(120,
+		= GLSL(130,
 		       in vec3 vertex_position;
 		       in vec2 vertex_uv;
 		       in vec3 vertex_normal;
@@ -242,6 +280,7 @@ void model::create_shader()
 		       out vec2 uv;
 		       out vec3 normal;
 		       out vec3 vertex;
+		       out vec4 vertex_light;
 		       out vec3 cam_pos;
 		       out vec3 light_pos;
 		       out vec3 light_color_specular_val;
@@ -256,13 +295,16 @@ void model::create_shader()
 		       uniform vec3 light_color_diffuse;
 		       uniform float shininess;
 
+			   uniform mat4 lightSpaceMatrix;
+
 		       void main(void)
 		       {
 		           uv = vertex_uv;
-				   normal = vertex_normal;
+				   normal = normalize(vertex_normal);
 				   vertex = vertex_position;
+				   vertex_light = lightSpaceMatrix * vec4(vertex_position, 1.0);
 				   cam_pos = camera_position;
-		           light_pos = light_position;
+				   light_pos = light_position;
 				   light_color_specular_val = light_color_specular;
 				   light_color_ambient_val = light_color_ambient;
 				   light_color_diffuse_val = light_color_diffuse;
@@ -272,7 +314,7 @@ void model::create_shader()
 		);
 
 	static auto fragment_shader_source
-		= GLSL(120,
+		= GLSL(130,
 		       in vec2 uv;
 		       in vec3 vertex;
 		       in vec3 normal;
@@ -282,63 +324,83 @@ void model::create_shader()
 		       in vec3 light_color_ambient_val;
 		       in vec3 light_color_diffuse_val;
 		       in float shininess_val;
+			   in vec4 vertex_light;
 
 		       uniform sampler2D texture_sampler;
+		       uniform sampler2D depth_map;
 
-			   vec3 get_r()
+			   float ShadowCalculation(vec4 fragPosLightSpace)
 			   {
 				   vec3 light_direction = normalize(light_pos - vertex);
-				   return normalize((2 * dot(light_direction, normal)) * normal - light_direction);
+				   vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+				   projCoords = projCoords * 0.5 + 0.5;
+
+				   if (projCoords.z > 1.0) return 0.0;
+			   	
+				   float closestDepth = texture(depth_map, projCoords.xy).r;
+				   float currentDepth = projCoords.z;
+			   	
+				   float bias = max(0.05 * (1.0 - dot(normal, light_direction)), 0.005);
+
+				   float shadow = 0.0;
+				   vec2 texelSize = 1.0 / textureSize(depth_map, 0);
+			   	
+				   for (int x = -1; x <= 1; ++x)
+				   {
+					   for (int y = -1; y <= 1; ++y)
+					   {
+						   float pcfDepth = texture(depth_map, projCoords.xy + vec2(x, y) * texelSize).r;
+						   shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+					   }
+				   }
+				   shadow /= 9.0;
+
+				   return shadow;
 			   }
 
-			   float get_rv_shiny()
+			   vec3 get_reflect_dir()
 			   {
-				   vec3 r = get_r();
+				   vec3 light_direction = normalize(light_pos - vertex);
+				   return reflect(-light_direction, normal);
+			   }
+
+			   float get_specular_strength()
+			   {
+				   vec3 reflect_dir = get_reflect_dir();
 				   vec3 cam_dir = normalize(cam_pos - vertex);
 
-				   float val = dot(r, cam_dir);
+				   float val = max(dot(reflect_dir, cam_dir), 0.0);
 				   return pow(val, shininess_val);
 			   }
 
-		       vec3 do_blinn_specular(vec3 color)
+		       vec3 do_specular()
 		       {
-				   float val = get_rv_shiny();
-
-				   color.r *= val * light_color_specular_val.r;
-				   color.g *= val * light_color_specular_val.g;
-				   color.b *= val * light_color_specular_val.b;
-		           return color;
+				   float val = get_specular_strength();
+		           return val * light_color_specular_val;
 		       }
 
-		       vec3 do_blinn_ambient(vec3 color)
+		       vec3 do_ambient()
 		       {
-				   color.r *= light_color_ambient_val.r;
-				   color.g *= light_color_ambient_val.g;
-				   color.b *= light_color_ambient_val.b;
-		       	
-				   return color;
+				   return light_color_ambient_val;
 		       }
 
-		       vec3 do_blinn_diffuse(vec3 color)
+		       vec3 do_diffuse()
 		       {
 				   vec3 light_direction = normalize(light_pos - vertex);
-				   float scale = dot(light_direction, normalize(normal));
-
-				   color.r *= scale * light_color_diffuse_val.r;
-				   color.g *= scale * light_color_diffuse_val.g;
-				   color.b *= scale * light_color_diffuse_val.b;
-				   return color;
+				   float scale = max(dot(light_direction, normal), 0.0);
+				   return scale * light_color_diffuse_val;
 		       }
 
-		       vec3 do_blinn_shading(vec3 color)
+		       vec3 do_shading(vec3 color)
 		       {
-				   return do_blinn_ambient(color) + do_blinn_diffuse(color) + do_blinn_specular(color);
+				   float shadow = ShadowCalculation(vertex_light);
+				   return color * (do_ambient() + (1.0 - shadow) * (do_diffuse() + do_specular()));
 		       }
 
 		       void main(void)
 		       {
 				   gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));
-				   gl_FragColor.rgb = do_blinn_shading(gl_FragColor.rgb);
+				   gl_FragColor.rgb = do_shading(gl_FragColor.rgb);
 		       };
 		);
 
@@ -346,7 +408,7 @@ void model::create_shader()
 
 
 	static auto vertex_shader_source_no
-		= GLSL(120,
+		= GLSL(130,
 		       in vec3 vertex_position;
 		       in vec2 vertex_uv;
 		       in vec3 vertex_normal;
@@ -365,7 +427,7 @@ void model::create_shader()
 		);
 
 	static auto fragment_shader_source_no
-		= GLSL(120,
+		= GLSL(130,
 		       in vec2 uv;
 		       in vec3 vertex;
 		       in vec3 normal;
@@ -379,4 +441,120 @@ void model::create_shader()
 		);
 
 	this->shader_program_no = std::make_unique<shader>(vertex_shader_source_no, fragment_shader_source_no, std::vector<std::string>{ "vertex_position", "vertex_uv", "vertex_normal" });
+
+	static auto vertex_shader_shadow
+		= GLSL(130,
+			in vec3 vertex_position;
+	in vec2 vertex_uv;
+	in vec3 vertex_normal;
+
+	uniform mat4 lightSpaceMatrix;
+
+	void main(void)
+	{
+		gl_Position = lightSpaceMatrix * vec4(vertex_position, 1.0);
+	}
+	);
+
+	static auto fragment_shader_shadow
+		= GLSL(130,
+
+	uniform sampler2D texture_sampler;
+
+	void main(void)
+	{
+		//gl_FragColor = texture2D(texture_sampler, vec2(uv.x, -uv.y));
+	}
+	);
+
+	this->shadow_map = std::make_unique<shader>(vertex_shader_shadow, fragment_shader_shadow, std::vector<std::string>{ "vertex_position", "vertex_uv", "vertex_normal" });
+}
+
+void model::generate_lightmap()
+{
+	unsigned int depthMapFBO;
+	glGenFramebuffers(1, &depthMapFBO);
+
+	const unsigned int SHADOW_WIDTH = 1024 * 2 * 2 * 2;
+	const unsigned int SHADOW_HEIGHT = SHADOW_WIDTH;
+
+	glGenTextures(1, &depthMap);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+		SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	
+
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	float near_plane = 1.0f, far_plane = 5000.0f;
+	float radius = 4000.0f;
+	glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, near_plane, far_plane);
+
+	glm::mat4 lightView = glm::lookAt(glm::vec3(679.0f, 967.0f, 114.0f),
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(0.0f, 1.0f, 0.0f));
+
+	lightSpaceMatrix = lightProjection * lightView;
+
+	GLint m_viewport[4];
+	glGetIntegerv(GL_VIEWPORT, m_viewport);
+	glCullFace(GL_FRONT);
+	const auto _ = gsl::finally([&m_viewport]()
+	{
+		glCullFace(GL_BACK);
+		glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+	});
+
+	this->shadow_map->use();
+
+	GLint program;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+
+	GLint loc = glGetUniformLocation(program, "lightSpaceMatrix");
+	if (loc != -1)
+	{
+		glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+	}
+
+	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	glLoadIdentity();
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	glBindVertexArray(this->vertex_array);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+
+	for (size_t i = 0; i < this->faces_buffers.size() && i < this->texture_buffers.size(); ++i)
+	{
+		glBindTexture(GL_TEXTURE_2D, this->texture_buffers[i]);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->faces_buffers[i].index_buffer);
+		glDrawElements(GL_TRIANGLES, this->faces_buffers[i].count, GL_UNSIGNED_INT, nullptr);
+	}
+
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(2);
+
+	glfwSwapBuffers(*this->cam->get_frame());
+	
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

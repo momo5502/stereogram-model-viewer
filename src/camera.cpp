@@ -25,14 +25,19 @@ void camera::paint()
 	this->transform_world();
 }
 
-glm::dvec3 camera::get_position()
+glm::dvec3 camera::get_position() const
 {
 	return this->position;
 }
 
-glm::dvec3 camera::calculate_right_movement()
+window* camera::get_frame() const
 {
-	auto right = glm::cross(this->direction, this->up);
+	return this->frame;
+}
+
+glm::dvec3 camera::calculate_right_movement() const
+{
+	const auto right = glm::cross(this->direction, this->up);
 	return glm::normalize(right);
 }
 
@@ -140,4 +145,14 @@ void camera::transform_world()
 	gluLookAt(this->position[0], this->position[1], this->position[2],
 		      focus_point[0]   , focus_point[1]   , focus_point[2],
 		      this->up[0]      , this->up[1]      , this->up[2]);
+
+	static auto last_update = std::chrono::system_clock::now();
+	if(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - last_update) > 300ms)
+	{
+		char title[1024];
+		_snprintf_s(title, sizeof title, "\xF0\x9F\x92\xA9" " | %.2f %.2f %.2f", this->position[0], this->position[1], this->position[2]);
+		
+		last_update = std::chrono::system_clock::now();
+		this->frame->set_title(title);
+	}
 }
